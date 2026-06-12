@@ -1,26 +1,45 @@
-# SingBox Node Cascade Manager v1.0.3
+# SingBox Node Cascade Manager v1.0.4
 
-Автоматический менеджер каскада:
+Менеджер для каскада:
 
+```text
 CLIENT -> NODE1 -> NODE2 -> INTERNET
+```
+
+Стек:
+
+```text
+SingBox
+VLESS
+Reality
+Vision
+TCP 443
+```
+
+---
 
 ## Возможности
 
-- установка SingBox
-- настройка NODE2 (выход)
-- настройка NODE1 (вход -> NODE2)
-- VLESS Reality Vision
-- генерация UUID
-- генерация Reality ключей
-- смена SNI через меню
-- замена NODE2 без пересборки NODE1
-- клиентская ссылка
-- QR-код
-- резервные копии
-- диагностика
-- просмотр логов
-- автоперезапуск sing-box
-- RU/EN язык
+- установка SingBox;
+- настройка NODE2 как выходного сервера;
+- настройка NODE1 как входного сервера с каскадом на NODE2;
+- автоматическая генерация UUID;
+- автоматическая генерация Reality PrivateKey/PublicKey;
+- автоматическая генерация ShortID;
+- создание клиентской VLESS-ссылки;
+- QR-код для телефона;
+- смена SNI через меню;
+- замена NODE2 на NODE1 без ручного редактирования JSON;
+- просмотр параметров ноды;
+- просмотр логов;
+- live logs;
+- диагностика;
+- резервные копии конфигов;
+- автозапуск sing-box;
+- автоперезапуск sing-box при падении;
+- русский и английский язык.
+
+---
 
 ## Установка
 
@@ -34,11 +53,31 @@ bash <(curl -Ls https://raw.githubusercontent.com/vladislove1337-sfc/singbox-nod
 singbox-menu
 ```
 
-## Схема настройки
+---
+
+## Схема работы
+
+```text
+Клиент / телефон / ПК
+        ↓
+NODE1 — входной сервер
+        ↓
+NODE2 — выходной сервер
+        ↓
+Интернет
+```
+
+Клиент подключается только к NODE1.
+
+NODE1 сам отправляет весь трафик на NODE2.
+
+---
+
+## Порядок настройки
 
 ### 1. На NODE2
 
-Запустить меню:
+Запустить:
 
 ```bash
 singbox-menu
@@ -46,71 +85,132 @@ singbox-menu
 
 Выбрать:
 
-```
-1) Настроить NODE2
-```
-
-Получишь:
-
-```
-UUID
-PublicKey
-ShortID
-SNI
+```text
+1) Настроить NODE2 / выходной сервер
 ```
 
-Их сохранить.
+После настройки скрипт выдаст:
+
+```text
+NODE2_UUID
+NODE2_PUBLIC_KEY
+NODE2_SHORT_ID
+NODE2_SNI
+```
+
+Эти данные нужно скопировать и использовать при настройке NODE1.
 
 ---
 
 ### 2. На NODE1
 
+Запустить:
+
+```bash
+singbox-menu
+```
+
 Выбрать:
 
-```
-2) Настроить NODE1 -> NODE2
+```text
+2) Настроить NODE1 / входной сервер -> NODE2
 ```
 
 Вставить данные от NODE2:
 
-```
-IP NODE2
-UUID NODE2
-PublicKey NODE2
-ShortID NODE2
-SNI NODE2
+```text
+IP или домен NODE2
+NODE2_UUID
+NODE2_PUBLIC_KEY
+NODE2_SHORT_ID
+NODE2_SNI
 ```
 
-После этого NODE1 выдаст ссылку для клиента.
+После настройки NODE1 выдаст клиентскую ссылку.
 
 ---
 
-### Смена SNI
+## Главное правило
 
-Меню:
-
+```text
+Клиент -> NODE1:
+UUID = NODE1_UUID
+PublicKey = NODE1_PUBLIC_KEY
+ShortID = NODE1_SHORT_ID
+SNI = NODE1_SNI
 ```
+
+```text
+NODE1 -> NODE2:
+UUID = NODE2_UUID
+PublicKey = NODE2_PUBLIC_KEY
+ShortID = NODE2_SHORT_ID
+SNI = NODE2_SNI
+```
+
+```text
+NODE2:
+UUID = NODE2_UUID
+PrivateKey = NODE2_PRIVATE_KEY
+ShortID = NODE2_SHORT_ID
+```
+
+PrivateKey никогда не уходит наружу.
+
+PublicKey используется на противоположной стороне.
+
+---
+
+## Смена SNI
+
+В меню:
+
+```text
 6) Изменить SNI
 ```
 
-Можно менять:
+На NODE1 можно менять:
 
-- вход NODE1
-- выход NODE1 -> NODE2
-- оба
+```text
+1) SNI входа NODE1
+2) SNI выхода NODE1 -> NODE2
+3) Оба
+```
 
 ---
 
-### Если NODE2 умер
+## Замена NODE2
 
-Поднять новый NODE2.
+Если выходная нода умерла или нужно переключиться на другую:
 
-На NODE1:
+1. Настроить новый NODE2.
+2. Скопировать его данные.
+3. На NODE1 выбрать:
 
-```
+```text
 7) Изменить NODE2 на NODE1
 ```
 
-Вставить новые параметры.
+4. Вставить новые параметры NODE2.
 
-Готово.
+---
+
+## Полезные команды
+
+```bash
+systemctl status sing-box
+journalctl -u sing-box -f
+sing-box check -c /etc/sing-box/config.json
+ss -tulpn | grep 443
+```
+
+---
+
+## Файлы
+
+```text
+/etc/sing-box/config.json
+/root/singbox-node-cascade/node.env
+/root/singbox-node-cascade/settings.conf
+/root/singbox-node-cascade/backups/
+```
