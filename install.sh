@@ -12,7 +12,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 echo "======================================"
-echo " SingBox Node Cascade Installer"
+echo " SingBox Node Cascade Installer v1.0.0"
 echo " NODE1 -> NODE2"
 echo "======================================"
 
@@ -21,7 +21,7 @@ apt install -y curl wget nano jq qrencode openssl ca-certificates iproute2 netca
 
 mkdir -p "$INSTALL_DIR"
 
-echo "[+] Installing sing-box..."
+echo "[+] Installing / updating sing-box..."
 bash <(curl -fsSL https://sing-box.app/deb-install.sh)
 
 echo "[+] Downloading menu..."

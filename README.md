@@ -1,40 +1,40 @@
 # singbox-node-cascade
 
-Automatic SingBox Reality cascade installer and menu.
+SingBox Node Cascade Manager v1.0.0.
 
-Scheme:
+Схема:
 
 ```text
 Client -> NODE1 / ENTRY -> NODE2 / EXIT -> Internet
 ```
 
-## Install
+## Установка
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/vladislove1337-sfc/singbox-node-cascade/main/install.sh)
 ```
 
-After install:
+После установки:
 
 ```bash
 singbox-menu
 ```
 
-## Setup order
+## Порядок настройки
 
-### On NODE2 / EXIT
+### На NODE2 / выходном сервере
 
 ```bash
 singbox-menu
 ```
 
-Choose:
+Выбрать:
 
 ```text
-1) Configure NODE2 / EXIT
+1) Настроить NODE2 / выходной сервер
 ```
 
-Copy displayed values:
+Скопировать:
 
 ```text
 NODE2_UUID
@@ -43,32 +43,32 @@ NODE2_SHORT_ID
 NODE2_SNI
 ```
 
-### On NODE1 / ENTRY
+### На NODE1 / входном сервере
 
 ```bash
 singbox-menu
 ```
 
-Choose:
+Выбрать:
 
 ```text
-2) Configure NODE1 / ENTRY -> NODE2
+2) Настроить NODE1 / входной сервер -> NODE2
 ```
 
-Paste NODE2 values.
+Вставить данные NODE2.
 
-Then choose:
+Потом:
 
 ```text
-4) Show client link
-5) Show QR code
+4) Показать клиентскую ссылку
+5) Показать QR-код
 ```
 
-## Important
+## Важно
 
-Client connects only to NODE1.
+Клиент подключается только к NODE1.
 
-NODE1 connects to NODE2.
+NODE1 подключается к NODE2.
 
 ```text
 Client UUID = NODE1_UUID
@@ -77,7 +77,20 @@ Client PublicKey = NODE1_PUBLIC_KEY
 NODE1 outbound PublicKey = NODE2_PUBLIC_KEY
 ```
 
-## Useful
+## Что умеет меню
+
+- русский / английский язык
+- настройка NODE1 и NODE2
+- смена SNI
+- замена NODE2 на NODE1
+- QR-код
+- live logs
+- диагностика NODE1 -> NODE2
+- backup конфига
+- автостарт sing-box
+- автоперезапуск sing-box при падении
+
+## Полезные команды
 
 ```bash
 systemctl status sing-box

@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+VERSION="1.0.0"
+REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/vladislove1337-sfc/singbox-node-cascade/main}"
+INSTALL_DIR="/opt/singbox-node-cascade"
 CONFIG="/etc/sing-box/config.json"
 DATA_DIR="/root/singbox-node-cascade"
 ENV_FILE="$DATA_DIR/node.env"
+SETTINGS_FILE="$DATA_DIR/settings.conf"
 BACKUP_DIR="$DATA_DIR/backups"
 
 mkdir -p "$DATA_DIR" "$BACKUP_DIR"
@@ -12,10 +16,11 @@ red() { echo -e "\033[31m$*\033[0m"; }
 green() { echo -e "\033[32m$*\033[0m"; }
 yellow() { echo -e "\033[33m$*\033[0m"; }
 cyan() { echo -e "\033[36m$*\033[0m"; }
+bold() { echo -e "\033[1m$*\033[0m"; }
 
 pause() {
   echo
-  read -rp "Press Enter..."
+  read -rp "$(tr pause)" _
 }
 
 need_root() {
@@ -23,6 +28,113 @@ need_root() {
     red "Run as root."
     exit 1
   fi
+}
+
+init_lang() {
+  if [ -f "$SETTINGS_FILE" ]; then
+    # shellcheck disable=SC1090
+    source "$SETTINGS_FILE"
+  fi
+
+  if [ -z "${LANGUAGE:-}" ]; then
+    clear
+    echo "======================================"
+    echo " SingBox Node Cascade Manager"
+    echo "======================================"
+    echo
+    echo "Choose language / Выберите язык:"
+    echo "1) Русский"
+    echo "2) English"
+    echo
+    read -rp "> " lang_choice
+    case "$lang_choice" in
+      2) LANGUAGE="en" ;;
+      *) LANGUAGE="ru" ;;
+    esac
+    echo "LANGUAGE=$LANGUAGE" > "$SETTINGS_FILE"
+  fi
+}
+
+tr() {
+  local key="$1"
+  case "${LANGUAGE:-ru}:$key" in
+    ru:pause) echo "Нажми Enter..." ;;
+    en:pause) echo "Press Enter..." ;;
+
+    ru:title) echo "SingBox Node Cascade Manager" ;;
+    en:title) echo "SingBox Node Cascade Manager" ;;
+
+    ru:subtitle) echo "NODE1 -> NODE2 | VLESS Reality Vision" ;;
+    en:subtitle) echo "NODE1 -> NODE2 | VLESS Reality Vision" ;;
+
+    ru:menu1) echo "1) Настроить NODE2 / выходной сервер" ;;
+    en:menu1) echo "1) Configure NODE2 / EXIT node" ;;
+    ru:menu2) echo "2) Настроить NODE1 / входной сервер -> NODE2" ;;
+    en:menu2) echo "2) Configure NODE1 / ENTRY node -> NODE2" ;;
+    ru:menu3) echo "3) Показать параметры ноды" ;;
+    en:menu3) echo "3) Show node info" ;;
+    ru:menu4) echo "4) Показать клиентскую ссылку" ;;
+    en:menu4) echo "4) Show client link" ;;
+    ru:menu5) echo "5) Показать QR-код" ;;
+    en:menu5) echo "5) Show QR code" ;;
+    ru:menu6) echo "6) Изменить SNI" ;;
+    en:menu6) echo "6) Change SNI" ;;
+    ru:menu7) echo "7) Изменить NODE2 на NODE1" ;;
+    en:menu7) echo "7) Change NODE2 on NODE1" ;;
+    ru:menu8) echo "8) Перезапустить sing-box" ;;
+    en:menu8) echo "8) Restart sing-box" ;;
+    ru:menu9) echo "9) Статус и последние логи" ;;
+    en:menu9) echo "9) Status and last logs" ;;
+    ru:menu10) echo "10) Смотреть логи онлайн" ;;
+    en:menu10) echo "10) Live logs" ;;
+    ru:menu11) echo "11) Создать резервную копию конфига" ;;
+    en:menu11) echo "11) Backup config" ;;
+    ru:menu12) echo "12) Диагностика" ;;
+    en:menu12) echo "12) Diagnostics" ;;
+    ru:menu13) echo "13) Обновить менеджер из GitHub" ;;
+    en:menu13) echo "13) Update manager from GitHub" ;;
+    ru:menu14) echo "14) Сменить язык" ;;
+    en:menu14) echo "14) Change language" ;;
+    ru:menu0) echo "0) Выход" ;;
+    en:menu0) echo "0) Exit" ;;
+
+    ru:choice) echo "Выбор: " ;;
+    en:choice) echo "Choice: " ;;
+
+    ru:wrong) echo "Неверный выбор." ;;
+    en:wrong) echo "Wrong choice." ;;
+
+    ru:no_info) echo "Сохранённые данные не найдены. Сначала настрой NODE1 или NODE2." ;;
+    en:no_info) echo "No saved node info. Configure NODE1 or NODE2 first." ;;
+
+    ru:node2_ready) echo "NODE2 готов." ;;
+    en:node2_ready) echo "NODE2 is ready." ;;
+    ru:node1_ready) echo "NODE1 готов." ;;
+    en:node1_ready) echo "NODE1 is ready." ;;
+
+    ru:copy_node2) echo "СКОПИРУЙ ЭТИ ДАННЫЕ В NODE1:" ;;
+    en:copy_node2) echo "COPY THESE VALUES TO NODE1:" ;;
+
+    ru:client_link) echo "КЛИЕНТСКАЯ ССЫЛКА:" ;;
+    en:client_link) echo "CLIENT LINK:" ;;
+
+    ru:only_node1_link) echo "Клиентская ссылка есть только на NODE1." ;;
+    en:only_node1_link) echo "Client link exists only on NODE1." ;;
+
+    ru:config_missing) echo "Конфиг sing-box не найден." ;;
+    en:config_missing) echo "sing-box config not found." ;;
+
+    ru:sni_changed) echo "SNI изменён." ;;
+    en:sni_changed) echo "SNI changed." ;;
+
+    ru:node2_changed) echo "NODE2 изменён." ;;
+    en:node2_changed) echo "NODE2 changed." ;;
+
+    ru:updated) echo "Менеджер обновлён." ;;
+    en:updated) echo "Manager updated." ;;
+
+    *) echo "$key" ;;
+  esac
 }
 
 load_env() {
@@ -62,17 +174,9 @@ CLIENT_LINK=$CLIENT_LINK
 EOF
 }
 
-gen_uuid() {
-  sing-box generate uuid
-}
-
-gen_keypair() {
-  sing-box generate reality-keypair
-}
-
-gen_shortid() {
-  openssl rand -hex 8
-}
+gen_uuid() { sing-box generate uuid; }
+gen_keypair() { sing-box generate reality-keypair; }
+gen_shortid() { openssl rand -hex 8; }
 
 backup_config() {
   if [ -f "$CONFIG" ]; then
@@ -80,7 +184,7 @@ backup_config() {
     cp "$CONFIG" "$file"
     green "Backup saved: $file"
   else
-    yellow "Config not found."
+    yellow "$(tr config_missing)"
   fi
 }
 
@@ -89,15 +193,30 @@ check_port_443() {
     yellow "Port 443 is already used:"
     ss -tulpn | grep -E '[:.]443\s' || true
     echo
-    read -rp "Continue anyway? [y/N]: " ans
+    if [ "${LANGUAGE:-ru}" = "ru" ]; then
+      read -rp "Продолжить всё равно? [y/N]: " ans
+    else
+      read -rp "Continue anyway? [y/N]: " ans
+    fi
     [[ "${ans:-}" == "y" || "${ans:-}" == "Y" ]] || exit 1
   fi
 }
 
-restart_safe() {
-  sing-box check -c "$CONFIG"
+ensure_autostart() {
+  mkdir -p /etc/systemd/system/sing-box.service.d
+  cat >/etc/systemd/system/sing-box.service.d/restart.conf <<EOF
+[Service]
+Restart=always
+RestartSec=5s
+LimitNOFILE=infinity
+EOF
   systemctl daemon-reload
   systemctl enable sing-box || true
+}
+
+restart_safe() {
+  sing-box check -c "$CONFIG"
+  ensure_autostart
   systemctl restart sing-box
   sleep 0.3
   systemctl status sing-box --no-pager || true
@@ -108,10 +227,14 @@ build_client_link() {
 }
 
 configure_node2() {
-  cyan "=== Configure NODE2 / EXIT ==="
+  cyan "=== NODE2 / EXIT ==="
   check_port_443
 
-  read -rp "NODE2 SNI [api-maps.yandex.ru]: " NODE2_SNI
+  if [ "${LANGUAGE:-ru}" = "ru" ]; then
+    read -rp "SNI для NODE2 [api-maps.yandex.ru]: " NODE2_SNI
+  else
+    read -rp "NODE2 SNI [api-maps.yandex.ru]: " NODE2_SNI
+  fi
   NODE2_SNI=${NODE2_SNI:-api-maps.yandex.ru}
 
   NODE2_UUID=$(gen_uuid)
@@ -172,9 +295,9 @@ EOF
   restart_safe
   save_env_node2
 
-  green "NODE2 configured."
+  green "$(tr node2_ready)"
   echo
-  cyan "COPY THESE VALUES TO NODE1:"
+  cyan "$(tr copy_node2)"
   echo "NODE2_UUID=$NODE2_UUID"
   echo "NODE2_PUBLIC_KEY=$NODE2_PUBLIC_KEY"
   echo "NODE2_SHORT_ID=$NODE2_SHORT_ID"
@@ -182,21 +305,34 @@ EOF
 }
 
 configure_node1() {
-  cyan "=== Configure NODE1 / ENTRY -> NODE2 ==="
+  cyan "=== NODE1 / ENTRY -> NODE2 ==="
   check_port_443
 
-  read -rp "NODE2 IP/domain: " NODE2_ADDR
-  read -rp "NODE2 UUID: " NODE2_UUID
-  read -rp "NODE2 PublicKey: " NODE2_PUBLIC_KEY
-  read -rp "NODE2 ShortID: " NODE2_SHORT_ID
-  read -rp "NODE2 SNI [api-maps.yandex.ru]: " NODE2_SNI
-  NODE2_SNI=${NODE2_SNI:-api-maps.yandex.ru}
-
-  read -rp "NODE1 SNI [api-maps.yandex.ru]: " NODE1_SNI
+  if [ "${LANGUAGE:-ru}" = "ru" ]; then
+    read -rp "IP или домен NODE2: " NODE2_ADDR
+    read -rp "UUID NODE2: " NODE2_UUID
+    read -rp "PublicKey NODE2: " NODE2_PUBLIC_KEY
+    read -rp "ShortID NODE2: " NODE2_SHORT_ID
+    read -rp "SNI NODE2 [api-maps.yandex.ru]: " NODE2_SNI
+    NODE2_SNI=${NODE2_SNI:-api-maps.yandex.ru}
+    read -rp "SNI NODE1 [api-maps.yandex.ru]: " NODE1_SNI
+  else
+    read -rp "NODE2 IP/domain: " NODE2_ADDR
+    read -rp "NODE2 UUID: " NODE2_UUID
+    read -rp "NODE2 PublicKey: " NODE2_PUBLIC_KEY
+    read -rp "NODE2 ShortID: " NODE2_SHORT_ID
+    read -rp "NODE2 SNI [api-maps.yandex.ru]: " NODE2_SNI
+    NODE2_SNI=${NODE2_SNI:-api-maps.yandex.ru}
+    read -rp "NODE1 SNI [api-maps.yandex.ru]: " NODE1_SNI
+  fi
   NODE1_SNI=${NODE1_SNI:-api-maps.yandex.ru}
 
   DETECTED_IP=$(curl -4 -s ifconfig.me || true)
-  read -rp "NODE1 public IP/domain for client link [$DETECTED_IP]: " NODE1_ADDR
+  if [ "${LANGUAGE:-ru}" = "ru" ]; then
+    read -rp "Публичный IP/домен NODE1 для клиентской ссылки [$DETECTED_IP]: " NODE1_ADDR
+  else
+    read -rp "NODE1 public IP/domain for client link [$DETECTED_IP]: " NODE1_ADDR
+  fi
   NODE1_ADDR=${NODE1_ADDR:-$DETECTED_IP}
 
   NODE1_UUID=$(gen_uuid)
@@ -274,21 +410,22 @@ EOF
   restart_safe
   save_env_node1
 
-  green "NODE1 configured."
+  green "$(tr node1_ready)"
   echo
-  cyan "CLIENT LINK:"
+  cyan "$(tr client_link)"
   build_client_link
 }
 
 show_info() {
   load_env
   if [ ! -f "$ENV_FILE" ]; then
-    yellow "No saved info."
+    yellow "$(tr no_info)"
     return
   fi
 
   echo "====================================="
   echo "ROLE: ${ROLE:-unknown}"
+  echo "VERSION: $VERSION"
   echo "====================================="
   if [ "${ROLE:-}" = "NODE1" ]; then
     echo "NODE1 / ENTRY:"
@@ -318,7 +455,7 @@ show_info() {
 show_link() {
   load_env
   if [ "${ROLE:-}" != "NODE1" ]; then
-    yellow "Client link exists only on NODE1."
+    yellow "$(tr only_node1_link)"
     return
   fi
   build_client_link
@@ -327,7 +464,7 @@ show_link() {
 show_qr() {
   load_env
   if [ "${ROLE:-}" != "NODE1" ]; then
-    yellow "QR exists only on NODE1."
+    yellow "$(tr only_node1_link)"
     return
   fi
   LINK=$(build_client_link)
@@ -337,19 +474,26 @@ show_qr() {
 }
 
 choose_sni() {
-  echo "Choose SNI:"
+  echo "SNI:"
   echo "1) api-maps.yandex.ru"
   echo "2) yastatic.net"
   echo "3) avatars.mds.yandex.net"
   echo "4) mc.yandex.ru"
   echo "5) custom"
-  read -rp "Choice: " n
+  read -rp "> " n
   case "$n" in
     1) echo "api-maps.yandex.ru" ;;
     2) echo "yastatic.net" ;;
     3) echo "avatars.mds.yandex.net" ;;
     4) echo "mc.yandex.ru" ;;
-    5) read -rp "Custom SNI: " custom; echo "$custom" ;;
+    5)
+      if [ "${LANGUAGE:-ru}" = "ru" ]; then
+        read -rp "Свой SNI: " custom
+      else
+        read -rp "Custom SNI: " custom
+      fi
+      echo "$custom"
+      ;;
     *) echo "api-maps.yandex.ru" ;;
   esac
 }
@@ -357,7 +501,7 @@ choose_sni() {
 change_sni() {
   load_env
   if [ ! -f "$CONFIG" ]; then
-    red "Config not found."
+    red "$(tr config_missing)"
     return
   fi
 
@@ -370,16 +514,23 @@ change_sni() {
     mv /tmp/singbox-config.json "$CONFIG"
     sed -i "s|^NODE2_SNI=.*|NODE2_SNI=$NEW_SNI|" "$ENV_FILE"
     restart_safe
-    green "NODE2 SNI changed to $NEW_SNI"
+    green "$(tr sni_changed): $NEW_SNI"
     return
   fi
 
   if [ "${ROLE:-}" = "NODE1" ]; then
-    echo "What SNI to change?"
-    echo "1) NODE1 inbound SNI"
-    echo "2) NODE2 outbound SNI"
-    echo "3) Both"
-    read -rp "Choice: " c
+    if [ "${LANGUAGE:-ru}" = "ru" ]; then
+      echo "Что менять?"
+      echo "1) SNI входа NODE1"
+      echo "2) SNI выхода NODE1 -> NODE2"
+      echo "3) Оба"
+    else
+      echo "What SNI to change?"
+      echo "1) NODE1 inbound SNI"
+      echo "2) NODE2 outbound SNI"
+      echo "3) Both"
+    fi
+    read -rp "> " c
     NEW_SNI=$(choose_sni)
 
     case "$c" in
@@ -406,21 +557,21 @@ change_sni() {
         sed -i "s|^NODE2_SNI=.*|NODE2_SNI=$NEW_SNI|" "$ENV_FILE"
         ;;
       *)
-        red "Wrong choice."
+        red "$(tr wrong)"
         return
         ;;
     esac
 
     mv /tmp/singbox-config.json "$CONFIG"
     restart_safe
-    green "SNI changed to $NEW_SNI"
+    green "$(tr sni_changed): $NEW_SNI"
     echo
-    cyan "New client link:"
+    cyan "$(tr client_link)"
     show_link
     return
   fi
 
-  red "Unknown role. Configure node first."
+  red "$(tr no_info)"
 }
 
 change_node2() {
@@ -430,11 +581,19 @@ change_node2() {
     return
   fi
 
-  read -rp "New NODE2 IP/domain: " NODE2_ADDR
-  read -rp "New NODE2 UUID: " NODE2_UUID
-  read -rp "New NODE2 PublicKey: " NODE2_PUBLIC_KEY
-  read -rp "New NODE2 ShortID: " NODE2_SHORT_ID
-  read -rp "New NODE2 SNI [api-maps.yandex.ru]: " NODE2_SNI
+  if [ "${LANGUAGE:-ru}" = "ru" ]; then
+    read -rp "Новый IP/домен NODE2: " NODE2_ADDR
+    read -rp "Новый UUID NODE2: " NODE2_UUID
+    read -rp "Новый PublicKey NODE2: " NODE2_PUBLIC_KEY
+    read -rp "Новый ShortID NODE2: " NODE2_SHORT_ID
+    read -rp "Новый SNI NODE2 [api-maps.yandex.ru]: " NODE2_SNI
+  else
+    read -rp "New NODE2 IP/domain: " NODE2_ADDR
+    read -rp "New NODE2 UUID: " NODE2_UUID
+    read -rp "New NODE2 PublicKey: " NODE2_PUBLIC_KEY
+    read -rp "New NODE2 ShortID: " NODE2_SHORT_ID
+    read -rp "New NODE2 SNI [api-maps.yandex.ru]: " NODE2_SNI
+  fi
   NODE2_SNI=${NODE2_SNI:-api-maps.yandex.ru}
 
   jq \
@@ -460,14 +619,16 @@ change_node2() {
   sed -i "s|^NODE2_SNI=.*|NODE2_SNI=$NODE2_SNI|" "$ENV_FILE"
 
   restart_safe
-  green "NODE2 changed."
+  green "$(tr node2_changed)"
 }
 
 status_logs() {
   systemctl status sing-box --no-pager || true
   echo
+  cyan "Ports:"
   ss -tulpn | grep -E '443|sing-box' || true
   echo
+  cyan "Logs:"
   journalctl -u sing-box -n 80 --no-pager || true
 }
 
@@ -480,11 +641,16 @@ diagnostics() {
   sing-box check -c "$CONFIG" || true
   echo
   echo "=== service ==="
+  echo -n "enabled: "
   systemctl is-enabled sing-box || true
+  echo -n "active: "
   systemctl is-active sing-box || true
   echo
   echo "=== ports ==="
   ss -tulpn | grep -E '443|sing-box' || true
+  echo
+  echo "=== public IP ==="
+  curl -4 -s ifconfig.me || true
   echo
   load_env
   if [ "${ROLE:-}" = "NODE1" ]; then
@@ -494,28 +660,49 @@ diagnostics() {
   fi
 }
 
+update_manager() {
+  mkdir -p "$INSTALL_DIR"
+  wget -qO "$INSTALL_DIR/menu.sh" "$REPO_RAW/menu.sh"
+  chmod +x "$INSTALL_DIR/menu.sh"
+  ln -sf "$INSTALL_DIR/menu.sh" /usr/local/bin/singbox-menu
+  green "$(tr updated)"
+}
+
+change_language() {
+  echo "1) Русский"
+  echo "2) English"
+  read -rp "> " n
+  case "$n" in
+    2) LANGUAGE="en" ;;
+    *) LANGUAGE="ru" ;;
+  esac
+  echo "LANGUAGE=$LANGUAGE" > "$SETTINGS_FILE"
+}
+
 main_menu() {
   while true; do
     clear
-    echo "======================================"
-    echo " SingBox Node Cascade Manager"
-    echo " NODE1 -> NODE2"
-    echo "======================================"
-    echo "1) Configure NODE2 / EXIT"
-    echo "2) Configure NODE1 / ENTRY -> NODE2"
-    echo "3) Show node info"
-    echo "4) Show client link"
-    echo "5) Show QR code"
-    echo "6) Change SNI"
-    echo "7) Change NODE2 on NODE1"
-    echo "8) Restart sing-box"
-    echo "9) Status and last logs"
-    echo "10) Live logs"
-    echo "11) Backup config"
-    echo "12) Diagnostics"
-    echo "0) Exit"
+    bold "======================================"
+    bold " $(tr title) v$VERSION"
+    bold " $(tr subtitle)"
+    bold "======================================"
+    echo "$(tr menu1)"
+    echo "$(tr menu2)"
+    echo "$(tr menu3)"
+    echo "$(tr menu4)"
+    echo "$(tr menu5)"
+    echo "$(tr menu6)"
+    echo "$(tr menu7)"
+    echo "$(tr menu8)"
+    echo "$(tr menu9)"
+    echo "$(tr menu10)"
+    echo "$(tr menu11)"
+    echo "$(tr menu12)"
+    echo "$(tr menu13)"
+    echo "$(tr menu14)"
+    echo "$(tr menu0)"
     echo
-    read -rp "Choice: " choice
+    read -rp "$(tr choice)" choice
 
     case "$choice" in
       1) configure_node2; pause ;;
@@ -530,11 +717,14 @@ main_menu() {
       10) live_logs ;;
       11) backup_config; pause ;;
       12) diagnostics; pause ;;
+      13) update_manager; pause ;;
+      14) change_language; pause ;;
       0) exit 0 ;;
-      *) red "Wrong choice."; pause ;;
+      *) red "$(tr wrong)"; pause ;;
     esac
   done
 }
 
 need_root
+init_lang
 main_menu
