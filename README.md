@@ -1,12 +1,26 @@
-# singbox-node-cascade
+# SingBox Node Cascade Manager v1.0.3
 
-SingBox Node Cascade Manager v1.0.0.
+Автоматический менеджер каскада:
 
-Схема:
+CLIENT -> NODE1 -> NODE2 -> INTERNET
 
-```text
-Client -> NODE1 / ENTRY -> NODE2 / EXIT -> Internet
-```
+## Возможности
+
+- установка SingBox
+- настройка NODE2 (выход)
+- настройка NODE1 (вход -> NODE2)
+- VLESS Reality Vision
+- генерация UUID
+- генерация Reality ключей
+- смена SNI через меню
+- замена NODE2 без пересборки NODE1
+- клиентская ссылка
+- QR-код
+- резервные копии
+- диагностика
+- просмотр логов
+- автоперезапуск sing-box
+- RU/EN язык
 
 ## Установка
 
@@ -20,30 +34,11 @@ bash <(curl -Ls https://raw.githubusercontent.com/vladislove1337-sfc/singbox-nod
 singbox-menu
 ```
 
-## Порядок настройки
+## Схема настройки
 
-### На NODE2 / выходном сервере
+### 1. На NODE2
 
-```bash
-singbox-menu
-```
-
-Выбрать:
-
-```text
-1) Настроить NODE2 / выходной сервер
-```
-
-Скопировать:
-
-```text
-NODE2_UUID
-NODE2_PUBLIC_KEY
-NODE2_SHORT_ID
-NODE2_SNI
-```
-
-### На NODE1 / входном сервере
+Запустить меню:
 
 ```bash
 singbox-menu
@@ -51,50 +46,71 @@ singbox-menu
 
 Выбрать:
 
-```text
-2) Настроить NODE1 / входной сервер -> NODE2
+```
+1) Настроить NODE2
 ```
 
-Вставить данные NODE2.
+Получишь:
 
-Потом:
-
-```text
-4) Показать клиентскую ссылку
-5) Показать QR-код
+```
+UUID
+PublicKey
+ShortID
+SNI
 ```
 
-## Важно
+Их сохранить.
 
-Клиент подключается только к NODE1.
+---
 
-NODE1 подключается к NODE2.
+### 2. На NODE1
 
-```text
-Client UUID = NODE1_UUID
-NODE1 outbound UUID = NODE2_UUID
-Client PublicKey = NODE1_PUBLIC_KEY
-NODE1 outbound PublicKey = NODE2_PUBLIC_KEY
+Выбрать:
+
+```
+2) Настроить NODE1 -> NODE2
 ```
 
-## Что умеет меню
+Вставить данные от NODE2:
 
-- русский / английский язык
-- настройка NODE1 и NODE2
-- смена SNI
-- замена NODE2 на NODE1
-- QR-код
-- live logs
-- диагностика NODE1 -> NODE2
-- backup конфига
-- автостарт sing-box
-- автоперезапуск sing-box при падении
-
-## Полезные команды
-
-```bash
-systemctl status sing-box
-journalctl -u sing-box -f
-sing-box check -c /etc/sing-box/config.json
-ss -tulpn | grep 443
 ```
+IP NODE2
+UUID NODE2
+PublicKey NODE2
+ShortID NODE2
+SNI NODE2
+```
+
+После этого NODE1 выдаст ссылку для клиента.
+
+---
+
+### Смена SNI
+
+Меню:
+
+```
+6) Изменить SNI
+```
+
+Можно менять:
+
+- вход NODE1
+- выход NODE1 -> NODE2
+- оба
+
+---
+
+### Если NODE2 умер
+
+Поднять новый NODE2.
+
+На NODE1:
+
+```
+7) Изменить NODE2 на NODE1
+```
+
+Вставить новые параметры.
+
+Готово.
