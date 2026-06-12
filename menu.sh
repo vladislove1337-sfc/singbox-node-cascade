@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.0.4"
+VERSION="1.0.5"
 REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/vladislove1337-sfc/singbox-node-cascade/main}"
 INSTALL_DIR="/opt/singbox-node-cascade"
 CONFIG="/etc/sing-box/config.json"
@@ -9,6 +9,10 @@ DATA_DIR="/root/singbox-node-cascade"
 ENV_FILE="$DATA_DIR/node.env"
 SETTINGS_FILE="$DATA_DIR/settings.conf"
 BACKUP_DIR="$DATA_DIR/backups"
+
+SUB_DIR="/var/lib/singbox-node-cascade-sub"
+SUB_FILE="$SUB_DIR/sub.txt"
+SUB_SERVICE="/etc/systemd/system/singbox-subscription.service"
 
 mkdir -p "$DATA_DIR" "$BACKUP_DIR"
 
@@ -89,6 +93,10 @@ tr() {
     en:menu13) echo "13) Update manager from GitHub" ;;
     ru:menu14) echo "14) Сменить язык" ;;
     en:menu14) echo "14) Change language" ;;
+    ru:menu15) echo "15) Проверка каскада" ;;
+    en:menu15) echo "15) Cascade check" ;;
+    ru:menu16) echo "16) Настроить / показать подписку" ;;
+    en:menu16) echo "16) Setup / show subscription" ;;
     ru:menu0) echo "0) Выход" ;;
     en:menu0) echo "0) Exit" ;;
 
@@ -112,6 +120,8 @@ tr() {
 
     ru:only_node1_link) echo "Клиентская ссылка есть только на NODE1." ;;
     en:only_node1_link) echo "Client link exists only on NODE1." ;;
+    ru:only_node1_sub) echo "Подписка настраивается только на NODE1." ;;
+    en:only_node1_sub) echo "Subscription can be configured only on NODE1." ;;
     ru:config_missing) echo "Конфиг sing-box не найден." ;;
     en:config_missing) echo "sing-box config not found." ;;
     ru:sni_changed) echo "SNI изменён." ;;
@@ -140,6 +150,28 @@ load_env() {
 
 build_client_link() {
   echo "vless://${NODE1_UUID}@${NODE1_ADDR}:443?type=tcp&security=reality&pbk=${NODE1_PUBLIC_KEY}&fp=chrome&sni=${NODE1_SNI}&sid=${NODE1_SHORT_ID}&spx=%2F&flow=xtls-rprx-vision&encryption=none#SingBox-NODE1-NODE2"
+}
+
+update_client_link_env() {
+  load_env
+  if [ "${ROLE:-}" = "NODE1" ]; then
+    CLIENT_LINK=$(build_client_link)
+    safe_env_set "CLIENT_LINK" "$CLIENT_LINK"
+  fi
+}
+
+update_subscription_file() {
+  load_env
+  if [ "${ROLE:-}" != "NODE1" ]; then
+    return 0
+  fi
+  if [ -z "${SUB_TOKEN:-}" ] || [ -z "${SUB_PORT:-}" ]; then
+    return 0
+  fi
+  mkdir -p "$SUB_DIR"
+  chmod 700 "$SUB_DIR"
+  build_client_link > "$SUB_FILE"
+  chmod 600 "$SUB_FILE"
 }
 
 save_env_node2() {
@@ -403,6 +435,7 @@ EOF
 
   restart_safe
   save_env_node1
+  update_subscription_file
 
   green "$(tr node1_ready)"
   echo
@@ -436,6 +469,11 @@ show_info() {
     echo "PublicKey: ${NODE2_PUBLIC_KEY:-}"
     echo "ShortID:   ${NODE2_SHORT_ID:-}"
     echo "SNI:       ${NODE2_SNI:-}"
+    if [ -n "${SUB_PORT:-}" ] && [ -n "${SUB_TOKEN:-}" ]; then
+      echo
+      echo "Subscription:"
+      echo "http://${NODE1_ADDR}:${SUB_PORT}/${SUB_TOKEN}/sub.txt"
+    fi
   elif [ "${ROLE:-}" = "NODE2" ]; then
     echo "NODE2 / EXIT:"
     echo "UUID:       ${NODE2_UUID:-}"
@@ -452,6 +490,8 @@ show_link() {
     yellow "$(tr only_node1_link)"
     return
   fi
+  update_client_link_env
+  update_subscription_file
   build_client_link
 }
 
@@ -461,6 +501,8 @@ show_qr() {
     yellow "$(tr only_node1_link)"
     return
   fi
+  update_client_link_env
+  update_subscription_file
   LINK=$(build_client_link)
   echo "$LINK"
   echo
@@ -568,7 +610,17 @@ change_sni() {
 
     mv /tmp/singbox-config.json "$CONFIG"
     restart_safe
+    update_client_link_env
+    update_subscription_file
     green "$(tr sni_changed): $NEW_SNI"
+    echo
+    if [ "${LANGUAGE:-ru}" = "ru" ]; then
+      yellow "Если используешь одиночную ссылку — импортируй новую."
+      yellow "Если используешь подписку — обнови подписку в клиенте."
+    else
+      yellow "If you use a single link, import the new one."
+      yellow "If you use subscription, update subscription in client."
+    fi
     echo
     cyan "$(tr client_link)"
     show_link
@@ -623,6 +675,8 @@ change_node2() {
   safe_env_set "NODE2_SNI" "$NODE2_SNI"
 
   restart_safe
+  update_client_link_env
+  update_subscription_file
   green "$(tr node2_changed)"
 }
 
@@ -631,6 +685,9 @@ status_logs() {
   echo
   cyan "Ports:"
   ss -tulpn | grep -E '443|sing-box' || true
+  echo
+  cyan "Subscription service:"
+  systemctl status singbox-subscription --no-pager 2>/dev/null || true
   echo
   cyan "Logs:"
   journalctl -u sing-box -n 80 --no-pager || true
@@ -661,6 +718,178 @@ diagnostics() {
     echo
     echo "=== NODE1 -> NODE2 TCP test ==="
     nc -vz "$NODE2_ADDR" 443 || true
+  fi
+}
+
+cascade_check() {
+  load_env
+  echo "======================================"
+  echo " Cascade check"
+  echo "======================================"
+
+  if [ ! -f "$CONFIG" ]; then
+    red "❌ config.json not found"
+    return
+  fi
+
+  if sing-box check -c "$CONFIG" >/dev/null 2>&1; then
+    green "✅ sing-box config syntax OK"
+  else
+    red "❌ sing-box config syntax error"
+    sing-box check -c "$CONFIG" || true
+  fi
+
+  if systemctl is-active --quiet sing-box; then
+    green "✅ sing-box service active"
+  else
+    red "❌ sing-box service inactive"
+  fi
+
+  if systemctl is-enabled --quiet sing-box; then
+    green "✅ sing-box autostart enabled"
+  else
+    yellow "⚠️ sing-box autostart disabled"
+  fi
+
+  if ss -tulpn | grep -qE '[:.]443\s.*sing-box'; then
+    green "✅ sing-box listens on 443"
+  else
+    red "❌ sing-box does not listen on 443"
+  fi
+
+  if [ "${ROLE:-}" = "NODE1" ]; then
+    echo
+    echo "NODE1:"
+    if [ "$(jq -r '.inbounds[0].users[0].uuid' "$CONFIG")" = "${NODE1_UUID:-}" ]; then
+      green "✅ NODE1 inbound UUID matches node.env"
+    else
+      red "❌ NODE1 inbound UUID mismatch"
+    fi
+
+    if [ "$(jq -r '.inbounds[0].tls.server_name' "$CONFIG")" = "${NODE1_SNI:-}" ]; then
+      green "✅ NODE1 inbound SNI matches node.env"
+    else
+      red "❌ NODE1 inbound SNI mismatch"
+    fi
+
+    if [ "$(jq -r '.outbounds[0].uuid' "$CONFIG")" = "${NODE2_UUID:-}" ]; then
+      green "✅ NODE1 outbound UUID matches NODE2 UUID"
+    else
+      red "❌ NODE1 outbound UUID mismatch"
+    fi
+
+    if [ "$(jq -r '.outbounds[0].tls.reality.public_key' "$CONFIG")" = "${NODE2_PUBLIC_KEY:-}" ]; then
+      green "✅ NODE1 outbound PublicKey matches node.env"
+    else
+      red "❌ NODE1 outbound PublicKey mismatch"
+    fi
+
+    if [ "$(jq -r '.outbounds[0].tls.reality.short_id' "$CONFIG")" = "${NODE2_SHORT_ID:-}" ]; then
+      green "✅ NODE1 outbound ShortID matches node.env"
+    else
+      red "❌ NODE1 outbound ShortID mismatch"
+    fi
+
+    echo
+    echo "NODE1 -> NODE2 network:"
+    if nc -vz "$NODE2_ADDR" 443 >/tmp/sbcm-nc.log 2>&1; then
+      green "✅ NODE2 ${NODE2_ADDR}:443 reachable from NODE1"
+    else
+      red "❌ NODE2 ${NODE2_ADDR}:443 is NOT reachable from NODE1"
+      cat /tmp/sbcm-nc.log || true
+    fi
+
+    echo
+    if [ -n "${SUB_PORT:-}" ] && [ -n "${SUB_TOKEN:-}" ]; then
+      if systemctl is-active --quiet singbox-subscription; then
+        green "✅ subscription service active"
+      else
+        yellow "⚠️ subscription service inactive"
+      fi
+      echo "Subscription URL:"
+      echo "http://${NODE1_ADDR}:${SUB_PORT}/${SUB_TOKEN}/sub.txt"
+    else
+      yellow "⚠️ subscription is not configured"
+    fi
+
+  elif [ "${ROLE:-}" = "NODE2" ]; then
+    echo
+    echo "NODE2:"
+    if [ "$(jq -r '.inbounds[0].users[0].uuid' "$CONFIG")" = "${NODE2_UUID:-}" ]; then
+      green "✅ NODE2 inbound UUID matches node.env"
+    else
+      red "❌ NODE2 inbound UUID mismatch"
+    fi
+
+    if [ "$(jq -r '.inbounds[0].tls.server_name' "$CONFIG")" = "${NODE2_SNI:-}" ]; then
+      green "✅ NODE2 SNI matches node.env"
+    else
+      red "❌ NODE2 SNI mismatch"
+    fi
+  else
+    yellow "⚠️ Unknown role. Configure NODE1 or NODE2 first."
+  fi
+}
+
+setup_subscription() {
+  load_env
+  if [ "${ROLE:-}" != "NODE1" ]; then
+    yellow "$(tr only_node1_sub)"
+    return
+  fi
+
+  if [ -z "${SUB_PORT:-}" ]; then
+    if [ "${LANGUAGE:-ru}" = "ru" ]; then
+      read -rp "Порт подписки [2096]: " SUB_PORT
+    else
+      read -rp "Subscription port [2096]: " SUB_PORT
+    fi
+    SUB_PORT=${SUB_PORT:-2096}
+  fi
+
+  if [ -z "${SUB_TOKEN:-}" ]; then
+    SUB_TOKEN=$(openssl rand -hex 16)
+  fi
+
+  mkdir -p "$SUB_DIR/$SUB_TOKEN"
+  build_client_link > "$SUB_DIR/$SUB_TOKEN/sub.txt"
+  chmod -R 700 "$SUB_DIR"
+
+  cat > "$SUB_SERVICE" <<EOF
+[Unit]
+Description=SingBox Node Cascade Subscription Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$SUB_DIR
+ExecStart=/usr/bin/python3 -m http.server $SUB_PORT --bind 0.0.0.0
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  systemctl daemon-reload
+  systemctl enable singbox-subscription
+  systemctl restart singbox-subscription
+
+  safe_env_set "SUB_PORT" "$SUB_PORT"
+  safe_env_set "SUB_TOKEN" "$SUB_TOKEN"
+  update_subscription_file
+  cp "$SUB_FILE" "$SUB_DIR/$SUB_TOKEN/sub.txt" 2>/dev/null || true
+
+  echo
+  green "Subscription is ready:"
+  echo "http://${NODE1_ADDR}:${SUB_PORT}/${SUB_TOKEN}/sub.txt"
+  echo
+  if [ "${LANGUAGE:-ru}" = "ru" ]; then
+    yellow "Важно: если на VPS включён firewall, открой TCP порт $SUB_PORT."
+    yellow "В клиент добавляй именно эту ссылку как подписку, не как одиночный сервер."
+  else
+    yellow "Important: if firewall is enabled, open TCP port $SUB_PORT."
+    yellow "Add this URL as subscription, not as a single server."
   fi
 }
 
@@ -704,6 +933,8 @@ main_menu() {
     echo "$(tr menu12)"
     echo "$(tr menu13)"
     echo "$(tr menu14)"
+    echo "$(tr menu15)"
+    echo "$(tr menu16)"
     echo "$(tr menu0)"
     echo
     read -rp "$(tr choice)" choice
@@ -723,6 +954,8 @@ main_menu() {
       12) diagnostics; pause ;;
       13) update_manager; pause ;;
       14) change_language; pause ;;
+      15) cascade_check; pause ;;
+      16) setup_subscription; pause ;;
       0) exit 0 ;;
       *) red "$(tr wrong)"; pause ;;
     esac

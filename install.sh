@@ -12,12 +12,12 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 echo "======================================"
-echo " SingBox Node Cascade Installer v1.0.4"
+echo " SingBox Node Cascade Installer v1.0.5"
 echo " NODE1 -> NODE2"
 echo "======================================"
 
 apt update
-apt install -y curl wget nano jq qrencode openssl ca-certificates iproute2 netcat-openbsd
+apt install -y curl wget nano jq qrencode openssl ca-certificates iproute2 netcat-openbsd python3
 
 mkdir -p "$INSTALL_DIR"
 
