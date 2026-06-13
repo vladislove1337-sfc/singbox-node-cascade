@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.0.5"
+VERSION="1.0.6"
 REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/vladislove1337-sfc/singbox-node-cascade/main}"
 INSTALL_DIR="/opt/singbox-node-cascade"
 CONFIG="/etc/sing-box/config.json"
@@ -97,6 +97,8 @@ tr() {
     en:menu15) echo "15) Cascade check" ;;
     ru:menu16) echo "16) Настроить / показать подписку" ;;
     en:menu16) echo "16) Setup / show subscription" ;;
+    ru:menu17) echo "17) Удалить SingBox Node Cascade" ;;
+    en:menu17) echo "17) Uninstall SingBox Node Cascade" ;;
     ru:menu0) echo "0) Выход" ;;
     en:menu0) echo "0) Exit" ;;
 
@@ -893,12 +895,103 @@ EOF
   fi
 }
 
+
+uninstall_all() {
+  clear
+  echo "======================================"
+  if [ "${LANGUAGE:-ru}" = "ru" ]; then
+    echo " УДАЛЕНИЕ SingBox Node Cascade"
+    echo "======================================"
+    echo
+    echo "Будет удалено:"
+    echo "- sing-box"
+    echo "- /etc/sing-box"
+    echo "- /opt/singbox-node-cascade"
+    echo "- /root/singbox-node-cascade"
+    echo "- /var/lib/singbox-node-cascade-sub"
+    echo "- /usr/local/bin/singbox-menu"
+    echo "- сервис подписки"
+    echo
+    echo "SSH, firewall и системные пакеты curl/wget/jq/nano НЕ трогаются."
+    echo
+    read -rp "Напиши DELETE для подтверждения: " confirm
+  else
+    echo " UNINSTALL SingBox Node Cascade"
+    echo "======================================"
+    echo
+    echo "Will be removed:"
+    echo "- sing-box"
+    echo "- /etc/sing-box"
+    echo "- /opt/singbox-node-cascade"
+    echo "- /root/singbox-node-cascade"
+    echo "- /var/lib/singbox-node-cascade-sub"
+    echo "- /usr/local/bin/singbox-menu"
+    echo "- subscription service"
+    echo
+    echo "SSH, firewall and system packages curl/wget/jq/nano will NOT be touched."
+    echo
+    read -rp "Type DELETE to confirm: " confirm
+  fi
+
+  if [ "$confirm" != "DELETE" ]; then
+    if [ "${LANGUAGE:-ru}" = "ru" ]; then
+      echo "Отмена."
+    else
+      echo "Cancelled."
+    fi
+    return
+  fi
+
+  echo
+  echo "[+] Stopping services..."
+
+  systemctl stop sing-box 2>/dev/null || true
+  systemctl disable sing-box 2>/dev/null || true
+
+  systemctl stop singbox-subscription 2>/dev/null || true
+  systemctl disable singbox-subscription 2>/dev/null || true
+
+  echo "[+] Removing files..."
+
+  rm -rf /etc/sing-box
+  rm -rf /opt/singbox-node-cascade
+  rm -rf /root/singbox-node-cascade
+  rm -rf /var/lib/singbox-node-cascade-sub
+
+  rm -f /usr/local/bin/singbox-menu
+
+  rm -f /etc/systemd/system/singbox-subscription.service
+  rm -rf /etc/systemd/system/sing-box.service.d
+
+  echo "[+] Removing sing-box package..."
+
+  apt purge -y sing-box 2>/dev/null || true
+  apt autoremove -y 2>/dev/null || true
+
+  systemctl daemon-reload
+
+  echo
+  if [ "${LANGUAGE:-ru}" = "ru" ]; then
+    green "Готово. SingBox Node Cascade полностью удалён."
+  else
+    green "Done. SingBox Node Cascade has been completely removed."
+  fi
+}
+
 update_manager() {
   mkdir -p "$INSTALL_DIR"
   wget -qO "$INSTALL_DIR/menu.sh" "$REPO_RAW/menu.sh"
   chmod +x "$INSTALL_DIR/menu.sh"
   ln -sf "$INSTALL_DIR/menu.sh" /usr/local/bin/singbox-menu
   green "$(tr updated)"
+  echo
+  if [ "${LANGUAGE:-ru}" = "ru" ]; then
+    echo "Перезапускаю менеджер..."
+  else
+    echo "Restarting manager..."
+  fi
+  sleep 1
+  exec /usr/local/bin/singbox-menu
 }
 
 change_language() {
@@ -935,6 +1028,7 @@ main_menu() {
     echo "$(tr menu14)"
     echo "$(tr menu15)"
     echo "$(tr menu16)"
+    echo "$(tr menu17)"
     echo "$(tr menu0)"
     echo
     read -rp "$(tr choice)" choice
@@ -956,6 +1050,7 @@ main_menu() {
       14) change_language; pause ;;
       15) cascade_check; pause ;;
       16) setup_subscription; pause ;;
+      17) uninstall_all; pause ;;
       0) exit 0 ;;
       *) red "$(tr wrong)"; pause ;;
     esac

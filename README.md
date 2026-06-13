@@ -1,4 +1,4 @@
-# SingBox Node Cascade Manager v1.0.5
+# SingBox Node Cascade Manager v1.0.6
 
 Менеджер для каскада:
 
@@ -40,7 +40,8 @@ TCP 443
 - резервные копии конфигов;
 - автозапуск sing-box;
 - автоперезапуск sing-box при падении;
-- русский и английский язык.
+- русский и английский язык;
+- полное удаление через меню.
 
 ---
 
@@ -223,3 +224,34 @@ ss -tulpn | grep 443
 /root/singbox-node-cascade/backups/
 /var/lib/singbox-node-cascade-sub/
 ```
+
+
+---
+
+## Удаление
+
+В меню:
+
+```text
+17) Удалить SingBox Node Cascade
+```
+
+Для подтверждения нужно написать:
+
+```text
+DELETE
+```
+
+Будет удалено:
+
+```text
+sing-box
+/etc/sing-box
+/opt/singbox-node-cascade
+/root/singbox-node-cascade
+/var/lib/singbox-node-cascade-sub
+/usr/local/bin/singbox-menu
+сервис подписки
+```
+
+SSH, firewall и системные пакеты curl/wget/jq/nano не трогаются.

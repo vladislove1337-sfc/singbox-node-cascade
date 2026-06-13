@@ -12,7 +12,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 echo "======================================"
-echo " SingBox Node Cascade Installer v1.0.5"
+echo " SingBox Node Cascade Installer v1.0.6"
 echo " NODE1 -> NODE2"
 echo "======================================"
 
