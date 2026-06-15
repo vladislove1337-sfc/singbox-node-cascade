@@ -1,7 +1,7 @@
 # SingBox Node Cascade Manager v1.0.6
 
 <p align="center">
-  <img src="assets/banner(4).png" width="800">
+  <img src="signbox_banner.png" width="800">
 </p>
 
 <h1 align="center">
