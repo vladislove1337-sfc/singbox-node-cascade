@@ -1,7 +1,7 @@
 # SingBox Node Cascade Manager v1.0.6
 
 <p align="center">
-  <img src="banner.jpg" width="800">
+  <img src="banner.png" width="800">
 </p>
 
 <h1 align="center">
