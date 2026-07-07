@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.0.6"
+VERSION="1.0.7"
 REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/vladislove1337-sfc/singbox-node-cascade/main}"
 INSTALL_DIR="/opt/singbox-node-cascade"
 CONFIG="/etc/sing-box/config.json"
@@ -145,6 +145,8 @@ pause() {
 
 load_env() {
   if [ -f "$ENV_FILE" ]; then
+    # Old versions stored CLIENT_LINK unquoted. It contains &, which breaks source.
+    sed -i '/^CLIENT_LINK=/d' "$ENV_FILE" 2>/dev/null || true
     # shellcheck disable=SC1090
     source "$ENV_FILE"
   fi
@@ -156,10 +158,9 @@ build_client_link() {
 
 update_client_link_env() {
   load_env
-  if [ "${ROLE:-}" = "NODE1" ]; then
-    CLIENT_LINK=$(build_client_link)
-    safe_env_set "CLIENT_LINK" "$CLIENT_LINK"
-  fi
+  # CLIENT_LINK is intentionally not stored in node.env because it contains &.
+  # It is generated dynamically by build_client_link.
+  return 0
 }
 
 update_subscription_file() {
@@ -188,7 +189,6 @@ EOF
 }
 
 save_env_node1() {
-  CLIENT_LINK=$(build_client_link)
   cat > "$ENV_FILE" <<EOF
 ROLE=NODE1
 NODE1_ADDR=$NODE1_ADDR
@@ -202,7 +202,6 @@ NODE2_UUID=$NODE2_UUID
 NODE2_PUBLIC_KEY=$NODE2_PUBLIC_KEY
 NODE2_SHORT_ID=$NODE2_SHORT_ID
 NODE2_SNI=$NODE2_SNI
-CLIENT_LINK=$CLIENT_LINK
 EOF
 }
 
