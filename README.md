@@ -1,12 +1,4 @@
-# SingBox Node Cascade Manager v1.0.6
-
-<p align="center">
-  <img src="signbox_banner.png" width="800">
-</p>
-
-<h1 align="center">
-SingBox Node Cascade Manager
-</h1>
+# SingBox Node Cascade Manager v1.0.7
 
 Менеджер для каскада:
 
@@ -263,3 +255,18 @@ sing-box
 ```
 
 SSH, firewall и системные пакеты curl/wget/jq/nano не трогаются.
+
+
+---
+
+## v1.0.7 fix
+
+Исправлено:
+
+```text
+Segmentation fault при "Показать клиентскую ссылку" / "Проверка каскада"
+```
+
+Причина была в старой строке `CLIENT_LINK=` внутри `node.env`: VLESS-ссылка содержит `&`, и bash ломался при `source node.env`.
+
+Теперь клиентская ссылка не хранится в `node.env`, а генерируется динамически.
